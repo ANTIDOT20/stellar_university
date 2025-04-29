@@ -1,0 +1,99 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'Inter', system-ui, sans-serif;
+  --font-space-grotesk: 'Space Grotesk', system-ui, sans-serif;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-su-navy text-white antialiased;
+    font-family: var(--font-inter);
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-space-grotesk);
+  }
+
+  ::selection {
+    @apply bg-su-gold/30 text-white;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-su-navy-2;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-su-border rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-su-text;
+  }
+}
+
+@layer components {
+  .gradient-text {
+    @apply bg-clip-text text-transparent bg-gold-gradient;
+  }
+
+  .gradient-text-green {
+    @apply bg-clip-text text-transparent bg-green-gradient;
+  }
+
+  .card-glass {
+    @apply bg-su-slate/60 border border-su-border/50 rounded-2xl backdrop-blur-sm;
+  }
+
+  .btn-primary {
+    @apply bg-su-gold text-su-navy font-semibold px-6 py-3 rounded-xl
+           hover:bg-su-gold-2 transition-all duration-200
+           active:scale-95 focus-visible:outline-none focus-visible:ring-2
+           focus-visible:ring-su-gold focus-visible:ring-offset-2
+           focus-visible:ring-offset-su-navy;
+  }
+
+  .btn-outline {
+    @apply border border-su-border text-white font-medium px-6 py-3 rounded-xl
+           hover:border-su-gold/60 hover:bg-su-slate/40 transition-all duration-200
+           active:scale-95 focus-visible:outline-none focus-visible:ring-2
+           focus-visible:ring-su-gold/50 focus-visible:ring-offset-2
+           focus-visible:ring-offset-su-navy;
+  }
+
+  .section-heading {
+    @apply text-3xl md:text-4xl font-bold text-white;
+  }
+
+  .section-sub {
+    @apply text-su-text text-lg leading-relaxed;
+  }
+}
+
+/* Star particle background effect */
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.star {
+  position: absolute;
+  border-radius: 50%;
+  background: white;
+  animation: twinkle var(--duration, 3s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+}
