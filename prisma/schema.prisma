@@ -1,0 +1,181 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  publicKey  String   @unique
+  role       Role     @default(STUDENT)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  student  Student?
+  lecturer Lecturer?
+  admin    Admin?
+}
+
+model Student {
+  id           String        @id @default(cuid())
+  matricNumber String        @unique
+  firstName    String
+  lastName     String
+  email        String        @unique
+  departmentId String
+  level        Int           @default(100)
+  status       StudentStatus @default(ACTIVE)
+  userId       String        @unique
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id])
+  enrollments Enrollment[]
+  payments    Payment[]
+  credentials Credential[]
+
+  @@index([departmentId])
+}
+
+model Lecturer {
+  id           String   @id @default(cuid())
+  staffId      String   @unique
+  firstName    String
+  lastName     String
+  email        String   @unique
+  departmentId String
+  userId       String   @unique
+  createdAt    DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  courses Course[]
+
+  @@index([departmentId])
+}
+
+model Admin {
+  id        String   @id @default(cuid())
+  staffId   String   @unique
+  userId    String   @unique
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Course {
+  id           String   @id @default(cuid())
+  code         String   @unique
+  title        String
+  description  String?
+  creditUnits  Int      @default(3)
+  level        Int
+  semester     Int
+  departmentId String
+  lecturerId   String?
+  contractId   String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lecturer    Lecturer?    @relation(fields: [lecturerId], references: [id])
+  enrollments Enrollment[]
+
+  @@index([departmentId])
+  @@index([level, semester])
+}
+
+model Enrollment {
+  id          String           @id @default(cuid())
+  studentId   String
+  courseId    String
+  session     String
+  semester    Int
+  score       Float?
+  grade       String?
+  gradePoints Float?
+  status      EnrollmentStatus @default(REGISTERED)
+  txHash      String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id])
+  course  Course  @relation(fields: [courseId], references: [id])
+
+  @@unique([studentId, courseId, session, semester])
+  @@index([studentId])
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  studentId     String
+  amount        Decimal       @db.Decimal(18, 7)
+  asset         String        @default("USDC")
+  level         Int
+  semester      Int
+  session       String
+  status        PaymentStatus @default(PENDING)
+  txHash        String?       @unique
+  anchorQuoteId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+}
+
+model Credential {
+  id            String         @id @default(cuid())
+  studentId     String
+  type          CredentialType
+  ipfsCid       String?
+  contractId    String?
+  txHash        String?
+  issuedAt      DateTime       @default(now())
+  degreeClass   String?
+  session       String?
+
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+}
+
+enum Role {
+  STUDENT
+  LECTURER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum StudentStatus {
+  ACTIVE
+  SUSPENDED
+  GRADUATED
+  WITHDRAWN
+  DEFERRED
+}
+
+enum EnrollmentStatus {
+  REGISTERED
+  GRADED
+  WITHDRAWN
+  INCOMPLETE
+}
+
+enum PaymentStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+  REFUNDED
+}
+
+enum CredentialType {
+  DEGREE
+  DIPLOMA
+  TRANSCRIPT
+  CERTIFICATE
+  KYC_TIER_1
+  KYC_TIER_2
+}
