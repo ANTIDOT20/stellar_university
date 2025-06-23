@@ -18,14 +18,14 @@ pub enum StudentStatus {
 #[contracttype]
 #[derive(Clone)]
 pub struct StudentRecord {
-    pub public_key:   Address,
-    pub matric:       String,
-    pub first_name:   String,
-    pub last_name:    String,
-    pub department:   String,
-    pub level:        u32,
-    pub status:       StudentStatus,
-    pub enrolled_at:  u64,
+    pub public_key:  Address,
+    pub matric:      String,
+    pub first_name:  String,
+    pub last_name:   String,
+    pub department:  String,
+    pub level:       u32,
+    pub status:      StudentStatus,
+    pub enrolled_at: u64,
 }
 
 #[contracttype]
@@ -36,7 +36,6 @@ pub enum DataKey {
     StudentCount,
 }
 
-#[derive(Debug)]
 #[contracttype]
 pub enum ContractError {
     AlreadyInitialized,
@@ -65,7 +64,7 @@ impl StudentRegistryContract {
     }
 
     pub fn register(
-        env: Env,
+        env:         Env,
         caller:      Address,
         matric:      String,
         first_name:  String,
@@ -77,6 +76,9 @@ impl StudentRegistryContract {
 
         if env.storage().persistent().has(&DataKey::MatricIndex(matric.clone())) {
             return Err(ContractError::AlreadyRegistered);
+        }
+        if level == 0 || level > 700 {
+            return Err(ContractError::InvalidInput);
         }
 
         let record = StudentRecord {
@@ -119,12 +121,11 @@ impl StudentRegistryContract {
         status:  StudentStatus,
     ) -> Result<(), ContractError> {
         Self::require_admin(&env, &caller)?;
-        let mut record = env
+        let mut record: StudentRecord = env
             .storage()
             .persistent()
-            .get::<_, StudentRecord>(&DataKey::Student(student.clone()))
+            .get(&DataKey::Student(student.clone()))
             .ok_or(ContractError::StudentNotFound)?;
-
         record.status = status;
         env.storage().persistent().set(&DataKey::Student(student.clone()), &record);
         env.events()
@@ -139,12 +140,14 @@ impl StudentRegistryContract {
         level:   u32,
     ) -> Result<(), ContractError> {
         Self::require_admin(&env, &caller)?;
-        let mut record = env
+        if level == 0 || level > 700 {
+            return Err(ContractError::InvalidInput);
+        }
+        let mut record: StudentRecord = env
             .storage()
             .persistent()
-            .get::<_, StudentRecord>(&DataKey::Student(student.clone()))
+            .get(&DataKey::Student(student.clone()))
             .ok_or(ContractError::StudentNotFound)?;
-
         record.level = level;
         env.storage().persistent().set(&DataKey::Student(student.clone()), &record);
         Ok(())
@@ -176,17 +179,22 @@ mod test {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env};
 
+    fn setup() -> (Env, Address, Address) {
+        let env       = Env::default();
+        env.mock_all_auths();
+        let id        = env.register_contract(None, StudentRegistryContract);
+        let client    = StudentRegistryContractClient::new(&env, &id);
+        let admin     = Address::generate(&env);
+        client.initialize(&admin);
+        (env, id, admin)
+    }
+
     #[test]
     fn test_register_and_get() {
-        let env    = Env::default();
-        env.mock_all_auths();
-        let contract_id = env.register_contract(None, StudentRegistryContract);
-        let client     = StudentRegistryContractClient::new(&env, &contract_id);
-        let admin      = Address::generate(&env);
-
-        client.initialize(&admin);
-
+        let (env, id, admin) = setup();
+        let client  = StudentRegistryContractClient::new(&env, &id);
         let student = Address::generate(&env);
+
         client.register(
             &student,
             &String::from_str(&env, "SU/2025/001"),
@@ -199,5 +207,59 @@ mod test {
         let rec = client.get_student(&student);
         assert_eq!(rec.level, 100);
         assert_eq!(client.count(), 1);
+    }
+
+    #[test]
+    fn test_duplicate_matric_rejected() {
+        let (env, id, admin) = setup();
+        let client   = StudentRegistryContractClient::new(&env, &id);
+        let s1       = Address::generate(&env);
+        let s2       = Address::generate(&env);
+        let matric   = String::from_str(&env, "SU/2025/001");
+
+        client.register(&s1, &matric,
+            &String::from_str(&env, "A"), &String::from_str(&env, "B"),
+            &String::from_str(&env, "CSC"), &100);
+
+        let res = client.try_register(&s2, &matric,
+            &String::from_str(&env, "C"), &String::from_str(&env, "D"),
+            &String::from_str(&env, "PHY"), &100);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_update_level() {
+        let (env, id, admin) = setup();
+        let client  = StudentRegistryContractClient::new(&env, &id);
+        let student = Address::generate(&env);
+
+        client.register(
+            &student,
+            &String::from_str(&env, "SU/2025/002"),
+            &String::from_str(&env, "Emeka"),
+            &String::from_str(&env, "Nwosu"),
+            &String::from_str(&env, "PHY"),
+            &100,
+        );
+        client.update_level(&admin, &student, &200);
+        let rec = client.get_student(&student);
+        assert_eq!(rec.level, 200);
+    }
+
+    #[test]
+    fn test_unauthorized_register_rejected() {
+        let (env, id, _admin) = setup();
+        let client    = StudentRegistryContractClient::new(&env, &id);
+        let non_admin = Address::generate(&env);
+
+        let res = client.try_register(
+            &non_admin,
+            &String::from_str(&env, "SU/2025/003"),
+            &String::from_str(&env, "Chioma"),
+            &String::from_str(&env, "Ike"),
+            &String::from_str(&env, "CHM"),
+            &100,
+        );
+        assert!(res.is_err());
     }
 }
