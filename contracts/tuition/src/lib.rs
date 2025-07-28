@@ -66,12 +66,15 @@ impl TuitionContract {
         env.storage().instance().set(&DataKey::Treasury, &treasury);
         env.storage().instance().set(&DataKey::PaymentCount, &0u32);
 
-        // Default fees by level (in USDC stroops: 7 decimals)
-        // 100-200 level: 150_000_0000000 = 150 USDC
-        for (level, fee) in [(100u32, 1_500_000_000i128), (200, 1_500_000_000),
-                              (300, 2_000_000_000), (400, 2_000_000_000),
-                              (500, 2_500_000_000), (600, 2_500_000_000),
-                              (700, 3_000_000_000)] {
+        for (level, fee) in [
+            (100u32, 1_500_000_000i128),
+            (200,    1_500_000_000),
+            (300,    2_000_000_000),
+            (400,    2_000_000_000),
+            (500,    2_500_000_000),
+            (600,    2_500_000_000),
+            (700,    3_000_000_000),
+        ] {
             env.storage().instance().set(&DataKey::Fee(level), &fee);
         }
         Ok(())
@@ -84,7 +87,12 @@ impl TuitionContract {
         amount: i128,
     ) -> Result<(), ContractError> {
         Self::require_admin(&env, &caller)?;
+        if amount <= 0 {
+            return Err(ContractError::InsufficientAmount);
+        }
         env.storage().instance().set(&DataKey::Fee(level), &amount);
+        env.events()
+            .publish((symbol_short!("tuition"), symbol_short!("fee")), (level, amount));
         Ok(())
     }
 
@@ -187,19 +195,19 @@ impl TuitionContract {
 mod test {
     use super::*;
     use soroban_sdk::{
-        testutils::{Address as _, MockAuth, MockAuthInvoke},
-        token::{Client as TokenClient, StellarAssetClient},
-        Env, IntoVal,
+        testutils::{Address as _},
+        token::StellarAssetClient,
+        Env,
     };
 
-    fn create_token(env: &Env, admin: &Address) -> Address {
+    fn mint(env: &Env, admin: &Address, target: &Address, amount: i128) -> Address {
         let id = env.register_stellar_asset_contract_v2(admin.clone());
-        StellarAssetClient::new(env, &id.address()).mint(admin, &10_000_000_000_000);
+        StellarAssetClient::new(env, &id.address()).mint(target, &amount);
         id.address()
     }
 
     #[test]
-    fn test_pay_tuition() {
+    fn test_pay_tuition_succeeds() {
         let env = Env::default();
         env.mock_all_auths();
         let id       = env.register_contract(None, TuitionContract);
@@ -207,22 +215,55 @@ mod test {
         let admin    = Address::generate(&env);
         let treasury = Address::generate(&env);
         let student  = Address::generate(&env);
-        let token    = create_token(&env, &admin);
-
-        // Fund student
-        StellarAssetClient::new(&env, &token).mint(&student, &5_000_000_000);
+        let token    = mint(&env, &admin, &student, 5_000_000_000);
 
         client.initialize(&admin, &token, &treasury);
-        client.pay(
-            &student,
-            &String::from_str(&env, "2024/2025"),
-            &1,
-            &100,
-        );
-        assert!(client.is_paid(
-            &student,
-            &String::from_str(&env, "2024/2025"),
-            &1,
-        ));
+        client.pay(&student, &String::from_str(&env, "2024/2025"), &1, &100);
+        assert!(client.is_paid(&student, &String::from_str(&env, "2024/2025"), &1));
+    }
+
+    #[test]
+    fn test_double_payment_rejected() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id       = env.register_contract(None, TuitionContract);
+        let client   = TuitionContractClient::new(&env, &id);
+        let admin    = Address::generate(&env);
+        let treasury = Address::generate(&env);
+        let student  = Address::generate(&env);
+        let token    = mint(&env, &admin, &student, 10_000_000_000);
+
+        client.initialize(&admin, &token, &treasury);
+        client.pay(&student, &String::from_str(&env, "2024/2025"), &1, &100);
+        let res = client.try_pay(&student, &String::from_str(&env, "2024/2025"), &1, &100);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_get_fee_returns_default() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id      = env.register_contract(None, TuitionContract);
+        let client  = TuitionContractClient::new(&env, &id);
+        let admin   = Address::generate(&env);
+        let treasury = Address::generate(&env);
+        let token    = Address::generate(&env);
+        client.initialize(&admin, &token, &treasury);
+        assert_eq!(client.get_fee(&100), 1_500_000_000i128);
+        assert_eq!(client.get_fee(&300), 2_000_000_000i128);
+    }
+
+    #[test]
+    fn test_set_fee_by_admin() {
+        let env = Env::default();
+        env.mock_all_auths();
+        let id      = env.register_contract(None, TuitionContract);
+        let client  = TuitionContractClient::new(&env, &id);
+        let admin   = Address::generate(&env);
+        let treasury = Address::generate(&env);
+        let token    = Address::generate(&env);
+        client.initialize(&admin, &token, &treasury);
+        client.set_fee(&admin, &100, &2_000_000_000);
+        assert_eq!(client.get_fee(&100), 2_000_000_000i128);
     }
 }
