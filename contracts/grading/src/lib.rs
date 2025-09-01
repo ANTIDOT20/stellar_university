@@ -25,6 +25,7 @@ pub enum DataKey {
     Admin,
     EnrollmentContract,
     Grade(Address, String, String, u32),
+    GradeCount,
 }
 
 #[contracttype]
@@ -54,8 +55,8 @@ pub struct GradingContract;
 #[contractimpl]
 impl GradingContract {
     pub fn initialize(
-        env:                Env,
-        admin:              Address,
+        env:                 Env,
+        admin:               Address,
         enrollment_contract: Address,
     ) -> Result<(), ContractError> {
         if env.storage().instance().has(&DataKey::Admin) {
@@ -66,6 +67,7 @@ impl GradingContract {
         env.storage()
             .instance()
             .set(&DataKey::EnrollmentContract, &enrollment_contract);
+        env.storage().instance().set(&DataKey::GradeCount, &0u32);
         Ok(())
     }
 
@@ -79,9 +81,11 @@ impl GradingContract {
         score:        u32,
         credit_units: u32,
     ) -> Result<(), ContractError> {
-        Self::require_admin_or_lecturer(&env, &lecturer)?;
-
+        lecturer.require_auth();
         if score > 100 {
+            return Err(ContractError::InvalidScore);
+        }
+        if credit_units == 0 || credit_units > 8 {
             return Err(ContractError::InvalidScore);
         }
 
@@ -110,6 +114,13 @@ impl GradingContract {
         };
         env.storage().persistent().set(&key, &record);
 
+        let count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::GradeCount)
+            .unwrap_or(0);
+        env.storage().instance().set(&DataKey::GradeCount, &(count + 1));
+
         env.events().publish(
             (symbol_short!("grade"), symbol_short!("submit")),
             (student, course, score),
@@ -130,16 +141,8 @@ impl GradingContract {
             .ok_or(ContractError::GradeNotFound)
     }
 
-    fn require_admin_or_lecturer(env: &Env, caller: &Address) -> Result<(), ContractError> {
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&DataKey::Admin)
-            .ok_or(ContractError::NotInitialized)?;
-        // Admin or any authorised lecturer may submit grades
-        caller.require_auth();
-        let _ = admin;
-        Ok(())
+    pub fn count(env: Env) -> u32 {
+        env.storage().instance().get(&DataKey::GradeCount).unwrap_or(0)
     }
 }
 
@@ -148,26 +151,30 @@ mod test {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env};
 
-    #[test]
-    fn test_submit_and_get_grade() {
-        let env = Env::default();
+    fn setup() -> (Env, Address, Address, Address) {
+        let env        = Env::default();
         env.mock_all_auths();
         let id         = env.register_contract(None, GradingContract);
-        let client     = GradingContractClient::new(&env, &id);
         let admin      = Address::generate(&env);
         let enrollment = Address::generate(&env);
-        let lecturer   = Address::generate(&env);
-        let student    = Address::generate(&env);
-
+        let client     = GradingContractClient::new(&env, &id);
         client.initialize(&admin, &enrollment);
+        (env, id, admin, enrollment)
+    }
+
+    #[test]
+    fn test_submit_grade_a() {
+        let (env, id, _, _) = setup();
+        let client   = GradingContractClient::new(&env, &id);
+        let lecturer = Address::generate(&env);
+        let student  = Address::generate(&env);
+
         client.submit_grade(
             &lecturer,
             &student,
             &String::from_str(&env, "CSC301"),
             &String::from_str(&env, "2024/2025"),
-            &1,
-            &75,
-            &3,
+            &1, &75, &3,
         );
 
         let g = client.get_grade(
@@ -176,7 +183,59 @@ mod test {
             &String::from_str(&env, "2024/2025"),
             &1,
         );
-        assert_eq!(g.score, 75);
         assert_eq!(g.grade_points, 5);
+        assert_eq!(client.count(), 1);
+    }
+
+    #[test]
+    fn test_boundary_grades() {
+        let (env, id, _, _) = setup();
+        let client   = GradingContractClient::new(&env, &id);
+        let lect     = Address::generate(&env);
+
+        let cases: &[(u32, u32)] = &[
+            (100, 5), (70, 5), (69, 4), (60, 4), (59, 3),
+            (50, 3),  (49, 2), (45, 2), (44, 1), (40, 1),
+            (39, 0),  (0, 0),
+        ];
+
+        for (score, expected_pts) in cases {
+            let student = Address::generate(&env);
+            client.submit_grade(
+                &lect, &student,
+                &String::from_str(&env, "TST001"),
+                &String::from_str(&env, "2024/2025"),
+                &1, score, &3,
+            );
+            let g = client.get_grade(
+                &student,
+                &String::from_str(&env, "TST001"),
+                &String::from_str(&env, "2024/2025"),
+                &1,
+            );
+            assert_eq!(g.grade_points, *expected_pts, "score={score}");
+        }
+    }
+
+    #[test]
+    fn test_duplicate_grade_rejected() {
+        let (env, id, _, _) = setup();
+        let client  = GradingContractClient::new(&env, &id);
+        let lect    = Address::generate(&env);
+        let student = Address::generate(&env);
+
+        client.submit_grade(
+            &lect, &student,
+            &String::from_str(&env, "CSC301"),
+            &String::from_str(&env, "2024/2025"),
+            &1, &65, &3,
+        );
+        let res = client.try_submit_grade(
+            &lect, &student,
+            &String::from_str(&env, "CSC301"),
+            &String::from_str(&env, "2024/2025"),
+            &1, &70, &3,
+        );
+        assert!(res.is_err());
     }
 }
