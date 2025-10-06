@@ -17,11 +17,11 @@ pub enum EnrollmentStatus {
 #[contracttype]
 #[derive(Clone)]
 pub struct EnrollmentRecord {
-    pub student:    Address,
-    pub course:     String,
-    pub session:    String,
-    pub semester:   u32,
-    pub status:     EnrollmentStatus,
+    pub student:     Address,
+    pub course:      String,
+    pub session:     String,
+    pub semester:    u32,
+    pub status:      EnrollmentStatus,
     pub enrolled_at: u64,
 }
 
@@ -127,11 +127,35 @@ impl EnrollmentContract {
             .ok_or(ContractError::EnrollmentNotFound)?;
         record.status = EnrollmentStatus::Withdrawn;
         env.storage().persistent().set(&key, &record);
-
         env.events().publish(
             (symbol_short!("enroll"), symbol_short!("drop")),
             (student, course),
         );
+        Ok(())
+    }
+
+    pub fn mark_graded(
+        env:      Env,
+        caller:   Address,
+        student:  Address,
+        course:   String,
+        session:  String,
+        semester: u32,
+    ) -> Result<(), ContractError> {
+        Self::require_admin(&env, &caller)?;
+        let key = DataKey::Enrollment(
+            student.clone(),
+            course.clone(),
+            session.clone(),
+            semester,
+        );
+        let mut record: EnrollmentRecord = env
+            .storage()
+            .persistent()
+            .get(&key)
+            .ok_or(ContractError::EnrollmentNotFound)?;
+        record.status = EnrollmentStatus::Graded;
+        env.storage().persistent().set(&key, &record);
         Ok(())
     }
 
@@ -171,26 +195,53 @@ mod test {
     use super::*;
     use soroban_sdk::{testutils::Address as _, Env};
 
-    #[test]
-    fn test_enroll_and_withdraw() {
-        let env = Env::default();
+    fn setup() -> (Env, Address, Address, Address) {
+        let env     = Env::default();
         env.mock_all_auths();
-        let id     = env.register_contract(None, EnrollmentContract);
-        let client = EnrollmentContractClient::new(&env, &id);
+        let id      = env.register_contract(None, EnrollmentContract);
         let admin   = Address::generate(&env);
         let tuition = Address::generate(&env);
-        let student = Address::generate(&env);
-
+        let client  = EnrollmentContractClient::new(&env, &id);
         client.initialize(&admin, &tuition);
+        (env, id, admin, tuition)
+    }
 
-        let course  = String::from_str(&env, "CSC301");
+    #[test]
+    fn test_enroll_and_count() {
+        let (env, id, _, _) = setup();
+        let client  = EnrollmentContractClient::new(&env, &id);
+        let student = Address::generate(&env);
+        let course  = String::from_str(&env, "SBC301");
         let session = String::from_str(&env, "2024/2025");
 
         client.enroll(&student, &course, &session, &1);
         assert_eq!(client.count(), 1);
+    }
 
+    #[test]
+    fn test_withdraw_sets_status() {
+        let (env, id, _, _) = setup();
+        let client  = EnrollmentContractClient::new(&env, &id);
+        let student = Address::generate(&env);
+        let course  = String::from_str(&env, "CSC301");
+        let session = String::from_str(&env, "2024/2025");
+
+        client.enroll(&student, &course, &session, &1);
         client.withdraw(&student, &course, &session, &1);
         let rec = client.get_enrollment(&student, &course, &session, &1);
         assert!(matches!(rec.status, EnrollmentStatus::Withdrawn));
+    }
+
+    #[test]
+    fn test_double_enroll_rejected() {
+        let (env, id, _, _) = setup();
+        let client  = EnrollmentContractClient::new(&env, &id);
+        let student = Address::generate(&env);
+        let course  = String::from_str(&env, "MTH101");
+        let session = String::from_str(&env, "2024/2025");
+
+        client.enroll(&student, &course, &session, &1);
+        let res = client.try_enroll(&student, &course, &session, &1);
+        assert!(res.is_err());
     }
 }
