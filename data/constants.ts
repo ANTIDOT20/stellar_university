@@ -60,14 +60,25 @@ export const GPA_CLASS_BOUNDARIES = {
 
 export const NAV_LINKS = [
   { label: "Faculties", href: "/faculties" },
-  { label: "About", href: "/about" },
-  { label: "Protocol", href: "/#protocol" },
-  { label: "Credential SDK", href: "/sdk" },
+  { label: "About",     href: "/about"     },
+  { label: "Verify",    href: "/verify"    },
+  { label: "Anchor",    href: "/anchor"    },
+  { label: "Blog",      href: "/blog"      },
+  { label: "Docs",      href: "/docs"      },
 ] as const;
 
 export const STATS = [
-  { label: "Faculties",    value: "8",  suffix: "" },
-  { label: "Departments",  value: "40+", suffix: "" },
-  { label: "Countries",    value: "50+", suffix: "" },
-  { label: "On-chain",     value: "100", suffix: "%" },
+  { label: "Students Enrolled", value: "1,240+", suffix: "" },
+  { label: "Faculties",         value: "8",      suffix: "" },
+  { label: "Departments",       value: "44",     suffix: "" },
+  { label: "On-chain Txns",     value: "4,800+", suffix: "" },
 ] as const;
+
+export const SOCIAL_LINKS = {
+  github:  "https://github.com/stellaru-protocol",
+  twitter: "https://twitter.com/stellaru_",
+  website: "https://stellaru.xyz",
+};
+
+export const CURRENT_SESSION  = "2025/2026";
+export const CURRENT_SEMESTER = 1;
