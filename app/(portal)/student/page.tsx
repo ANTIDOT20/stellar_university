@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { BookOpen, CreditCard, Award, TrendingUp, Clock, AlertCircle } from "lucide-react";
 import { useWallet } from "@/components/wallet/WalletContext";
 import { Badge } from "@/components/ui/Badge";
+import { Announcements } from "@/components/sections/Announcements";
 import Link from "next/link";
 
 interface StudentSummary {
@@ -136,21 +137,26 @@ export default function StudentDashboard() {
         ))}
       </div>
 
-      {/* Recent activity stub */}
-      <div className="card-glass rounded-xl p-6">
-        <h2 className="text-white font-semibold mb-4">Recent Activity</h2>
-        <div className="space-y-3">
-          {[
-            { action: "Account created on-chain", time: "Just now", type: "success" },
-            { action: "DID registered",           time: "Just now", type: "success" },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center gap-3 text-sm">
-              <div className="w-2 h-2 rounded-full bg-su-green shrink-0" />
-              <span className="text-su-text flex-1">{item.action}</span>
-              <span className="text-su-text/60 text-xs">{item.time}</span>
-            </div>
-          ))}
+      {/* Bottom row: activity + announcements */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="card-glass rounded-xl p-6">
+          <h2 className="text-white font-semibold mb-4">Recent Activity</h2>
+          <div className="space-y-3">
+            {[
+              { action: "Account created on-chain",        time: "Jan 5, 2026",  color: "bg-su-green"  },
+              { action: "DID registered on identity contract", time: "Jan 5, 2026",  color: "bg-su-green"  },
+              { action: "Wallet connected",                time: "Just now",     color: "bg-blue-400"  },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-3 text-sm">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${item.color}`} />
+                <span className="text-su-text flex-1">{item.action}</span>
+                <span className="text-su-text/60 text-xs">{item.time}</span>
+              </div>
+            ))}
+          </div>
         </div>
+
+        <Announcements />
       </div>
     </div>
   );
