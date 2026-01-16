@@ -149,6 +149,68 @@ impl GovernanceContract {
         Ok(())
     }
 
+    pub fn execute(
+        env:    Env,
+        caller: Address,
+        id:     u32,
+    ) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(ContractError::NotInitialized)?;
+        if caller != admin {
+            return Err(ContractError::Unauthorized);
+        }
+        caller.require_auth();
+
+        let mut p: Proposal = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Proposal(id))
+            .ok_or(ContractError::ProposalNotFound)?;
+
+        if p.status != ProposalStatus::Passed {
+            return Err(ContractError::ProposalClosed);
+        }
+
+        p.status = ProposalStatus::Executed;
+        env.storage().persistent().set(&DataKey::Proposal(id), &p);
+        env.events()
+            .publish((symbol_short!("gov"), symbol_short!("execute")), id);
+        Ok(())
+    }
+
+    pub fn cancel(
+        env:    Env,
+        caller: Address,
+        id:     u32,
+    ) -> Result<(), ContractError> {
+        let admin: Address = env
+            .storage()
+            .instance()
+            .get(&DataKey::Admin)
+            .ok_or(ContractError::NotInitialized)?;
+        if caller != admin {
+            return Err(ContractError::Unauthorized);
+        }
+        caller.require_auth();
+
+        let mut p: Proposal = env
+            .storage()
+            .persistent()
+            .get(&DataKey::Proposal(id))
+            .ok_or(ContractError::ProposalNotFound)?;
+
+        if p.status == ProposalStatus::Executed {
+            return Err(ContractError::ProposalClosed);
+        }
+
+        p.status = ProposalStatus::Cancelled;
+        env.storage().persistent().set(&DataKey::Proposal(id), &p);
+        Ok(())
+    }
+
     pub fn get_proposal(env: Env, id: u32) -> Result<Proposal, ContractError> {
         env.storage()
             .persistent()
