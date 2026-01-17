@@ -176,6 +176,24 @@ impl EnrollmentContract {
         env.storage().instance().get(&DataKey::EnrollmentCount).unwrap_or(0)
     }
 
+    /// Extend the TTL of an enrollment record so it isn't archived by the ledger.
+    /// Should be called annually by a cron-style keeper or by the student.
+    pub fn bump_expiry(
+        env:      Env,
+        student:  Address,
+        course:   String,
+        session:  String,
+        semester: u32,
+    ) -> Result<(), ContractError> {
+        let key = DataKey::Enrollment(student, course, session, semester);
+        if !env.storage().persistent().has(&key) {
+            return Err(ContractError::EnrollmentNotFound);
+        }
+        // Extend by ~1 year (approximately 365 * 17280 ledgers at 5s/ledger)
+        env.storage().persistent().extend_ttl(&key, 6_307_200, 6_307_200);
+        Ok(())
+    }
+
     fn require_admin(env: &Env, caller: &Address) -> Result<(), ContractError> {
         let admin: Address = env
             .storage()
