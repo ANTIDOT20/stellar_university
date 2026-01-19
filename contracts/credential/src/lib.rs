@@ -2,7 +2,7 @@
 
 use soroban_sdk::{
     contract, contractimpl, contracttype, symbol_short,
-    Address, Env, String, BytesN,
+    Address, Env, String, BytesN, Vec,
 };
 
 #[contracttype]
@@ -112,6 +112,22 @@ impl CredentialContract {
         Ok(!record.revoked)
     }
 
+    /// Batch-verify up to 10 credentials in a single simulation call.
+    /// Returns a Vec of booleans — true means valid, false means revoked or not found.
+    pub fn batch_verify(env: Env, ids: Vec<BytesN<32>>) -> Vec<bool> {
+        let mut results = Vec::new(&env);
+        for id in ids.iter() {
+            let valid = env
+                .storage()
+                .persistent()
+                .get::<_, CredentialRecord>(&DataKey::Credential(id.clone()))
+                .map(|r| !r.revoked)
+                .unwrap_or(false);
+            results.push_back(valid);
+        }
+        results
+    }
+
     pub fn get(env: Env, id: BytesN<32>) -> Result<CredentialRecord, ContractError> {
         env.storage()
             .persistent()
@@ -151,5 +167,80 @@ impl CredentialContract {
         }
         caller.require_auth();
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use soroban_sdk::{testutils::Address as _, vec, Env};
+
+    fn setup() -> (Env, Address, Address) {
+        let env    = Env::default();
+        env.mock_all_auths();
+        let id     = env.register_contract(None, CredentialContract);
+        let admin  = Address::generate(&env);
+        let client = CredentialContractClient::new(&env, &id);
+        client.initialize(&admin);
+        (env, id, admin)
+    }
+
+    #[test]
+    fn test_issue_and_verify() {
+        let (env, id, admin) = setup();
+        let client = CredentialContractClient::new(&env, &id);
+        let holder = Address::generate(&env);
+
+        let cred_id = client.issue(
+            &admin,
+            &holder,
+            &CredentialType::Degree,
+            &String::from_str(&env, "QmXyz"),
+            &String::from_str(&env, "First Class"),
+            &String::from_str(&env, "2024/2025"),
+        );
+        assert!(client.verify(&cred_id));
+    }
+
+    #[test]
+    fn test_revoke() {
+        let (env, id, admin) = setup();
+        let client = CredentialContractClient::new(&env, &id);
+        let holder = Address::generate(&env);
+
+        let cred_id = client.issue(
+            &admin,
+            &holder,
+            &CredentialType::Transcript,
+            &String::from_str(&env, "QmAbc"),
+            &String::from_str(&env, ""),
+            &String::from_str(&env, "2024/2025"),
+        );
+        client.revoke(&admin, &cred_id);
+        assert!(!client.verify(&cred_id));
+    }
+
+    #[test]
+    fn test_batch_verify() {
+        let (env, id, admin) = setup();
+        let client  = CredentialContractClient::new(&env, &id);
+        let holder1 = Address::generate(&env);
+        let holder2 = Address::generate(&env);
+
+        let id1 = client.issue(
+            &admin, &holder1, &CredentialType::Degree,
+            &String::from_str(&env, "Qm1"), &String::from_str(&env, "First"),
+            &String::from_str(&env, "2024/2025"),
+        );
+        let id2 = client.issue(
+            &admin, &holder2, &CredentialType::KycTier1,
+            &String::from_str(&env, "Qm2"), &String::from_str(&env, ""),
+            &String::from_str(&env, "2024/2025"),
+        );
+        client.revoke(&admin, &id2);
+
+        let results = client.batch_verify(&vec![&env, id1, id2]);
+        assert_eq!(results.get(0), Some(true));
+        assert_eq!(results.get(1), Some(false));
     }
 }
