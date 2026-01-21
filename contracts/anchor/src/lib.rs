@@ -204,6 +204,10 @@ impl AnchorContract {
             .ok_or(ContractError::TransferNotFound)
     }
 
+    pub fn transfer_count(env: Env) -> u32 {
+        env.storage().instance().get(&DataKey::TransferCount).unwrap_or(0)
+    }
+
     fn require_operator(env: &Env, caller: &Address) -> Result<(), ContractError> {
         caller.require_auth();
         let operator: Address = env
@@ -220,5 +224,86 @@ impl AnchorContract {
             return Err(ContractError::Unauthorized);
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use soroban_sdk::{
+        testutils::{Address as _, Ledger},
+        Env,
+    };
+
+    fn setup() -> (Env, Address, Address, Address, Address) {
+        let env      = Env::default();
+        env.mock_all_auths();
+        let id       = env.register_contract(None, AnchorContract);
+        let admin    = Address::generate(&env);
+        let operator = Address::generate(&env);
+        let token    = Address::generate(&env);
+        let tuition  = Address::generate(&env);
+        let client   = AnchorContractClient::new(&env, &id);
+        client.initialize(&admin, &operator, &token, &tuition);
+        (env, id, admin, operator, token)
+    }
+
+    #[test]
+    fn test_initiate_transfer() {
+        let (env, id, _, operator, _) = setup();
+        let client    = AnchorContractClient::new(&env, &id);
+        let sender    = Address::generate(&env);
+        let recipient = Address::generate(&env);
+
+        client.initiate_transfer(
+            &operator,
+            &String::from_str(&env, "TX001"),
+            &sender,
+            &recipient,
+            &1_500_000_000i128,
+            &String::from_str(&env, "tuition"),
+        );
+        assert_eq!(client.transfer_count(), 1);
+
+        let t = client.get_transfer(&String::from_str(&env, "TX001"));
+        assert!(matches!(t.status, TransferStatus::Pending));
+        assert_eq!(t.amount, 1_500_000_000i128);
+    }
+
+    #[test]
+    fn test_invalid_amount_rejected() {
+        let (env, id, _, operator, _) = setup();
+        let client = AnchorContractClient::new(&env, &id);
+        let sender    = Address::generate(&env);
+        let recipient = Address::generate(&env);
+
+        let res = client.try_initiate_transfer(
+            &operator,
+            &String::from_str(&env, "TX_BAD"),
+            &sender,
+            &recipient,
+            &0i128,
+            &String::from_str(&env, ""),
+        );
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn test_unauthorized_operator_rejected() {
+        let (env, id, _, _, _) = setup();
+        let client   = AnchorContractClient::new(&env, &id);
+        let stranger = Address::generate(&env);
+        let sender   = Address::generate(&env);
+        let recipient = Address::generate(&env);
+
+        let res = client.try_initiate_transfer(
+            &stranger,
+            &String::from_str(&env, "TX_UNAUTH"),
+            &sender,
+            &recipient,
+            &1_000_000_000i128,
+            &String::from_str(&env, ""),
+        );
+        assert!(res.is_err());
     }
 }
