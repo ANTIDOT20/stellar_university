@@ -13,6 +13,9 @@ import {
   LogOut,
   ChevronLeft,
   Menu,
+  Calendar,
+  Star,
+  Shield,
 } from "lucide-react";
 import { WalletProvider, useWallet } from "@/components/wallet/WalletContext";
 import { truncateAddress } from "@/lib/wallet";
@@ -22,8 +25,12 @@ const STUDENT_LINKS = [
   { href: "/portal/student",              label: "Dashboard",    icon: LayoutDashboard },
   { href: "/portal/student/registration", label: "Registration", icon: BookOpen        },
   { href: "/portal/student/fees",         label: "Fees",         icon: CreditCard      },
+  { href: "/portal/student/schedule",     label: "Schedule",     icon: Calendar        },
   { href: "/portal/student/results",      label: "Results",      icon: FileText        },
   { href: "/portal/student/certificate",  label: "Certificate",  icon: Award           },
+  { href: "/portal/student/transcript",   label: "Transcript",   icon: FileText        },
+  { href: "/portal/student/scholarship",  label: "Scholarships", icon: Star            },
+  { href: "/portal/student/did",          label: "Identity",     icon: Shield          },
 ];
 
 function Sidebar() {
