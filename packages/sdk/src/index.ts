@@ -2,6 +2,8 @@ export { StellarUClient } from "./client";
 export { CredentialVerifier } from "./credential";
 export { DidResolver } from "./did";
 export { AnchorClient } from "./anchor";
+export { EnrollmentClient } from "./enrollment";
+export type { EnrollmentRecord } from "./enrollment";
 export {
   isValidStellarAddress,
   isValidCredentialId,
