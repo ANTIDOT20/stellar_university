@@ -50,14 +50,30 @@ export async function uploadJSONToIPFS(payload: object, name: string): Promise<s
   return data.IpfsHash;
 }
 
-export function ipfsUrl(cid: string): string {
-  return `${PINATA_GATEWAY}/ipfs/${cid}`;
+const IPFS_GATEWAYS = [
+  PINATA_GATEWAY,
+  "https://ipfs.io",
+  "https://cloudflare-ipfs.com",
+];
+
+export function ipfsUrl(cid: string, gatewayIndex = 0): string {
+  const gw = IPFS_GATEWAYS[gatewayIndex] ?? IPFS_GATEWAYS[0];
+  return `${gw}/ipfs/${cid}`;
 }
 
 export async function fetchFromIPFS<T = unknown>(cid: string): Promise<T> {
-  const res = await fetch(ipfsUrl(cid));
-  if (!res.ok) throw new Error(`IPFS fetch failed: ${res.statusText}`);
-  return res.json() as Promise<T>;
+  let lastErr: Error | null = null;
+
+  for (let i = 0; i < IPFS_GATEWAYS.length; i++) {
+    try {
+      const res = await fetch(ipfsUrl(cid, i), { signal: AbortSignal.timeout(8_000) });
+      if (res.ok) return res.json() as Promise<T>;
+    } catch (err) {
+      lastErr = err as Error;
+    }
+  }
+
+  throw lastErr ?? new Error(`IPFS fetch failed for CID ${cid}`);
 }
 
 export interface CredentialMetadata {
