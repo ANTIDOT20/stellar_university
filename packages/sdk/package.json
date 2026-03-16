@@ -1,6 +1,6 @@
 {
   "name": "@stellaru/credential-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "StellarU credential verification SDK for the Stellar ecosystem",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -10,9 +10,14 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./utils": {
+      "import": "./dist/utils.mjs",
+      "require": "./dist/utils.js",
+      "types": "./dist/utils.d.ts"
     }
   },
-  "files": ["dist"],
+  "files": ["dist", "README.md", "CHANGELOG.md"],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts",
     "test":  "vitest run"
