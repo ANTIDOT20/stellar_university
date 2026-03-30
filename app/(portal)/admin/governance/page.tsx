@@ -13,7 +13,7 @@ interface Proposal {
   votesFor:     number;
   votesAgainst: number;
   quorum:       number;
-  status:       "Active" | "Passed" | "Rejected" | "Executed";
+  status:       "Active" | "Passed" | "Rejected" | "Executed" | "Cancelled";
   endsAt:       string;
 }
 
@@ -54,10 +54,11 @@ const MOCK: Proposal[] = [
 ];
 
 const STATUS_VARIANT: Record<string, "green" | "red" | "gold" | "blue" | "default"> = {
-  Active:   "blue",
-  Passed:   "green",
-  Rejected: "red",
-  Executed: "gold",
+  Active:    "blue",
+  Passed:    "green",
+  Rejected:  "red",
+  Executed:  "gold",
+  Cancelled: "default",
 };
 
 export default function GovernancePage() {
@@ -129,12 +130,19 @@ export default function GovernancePage() {
                     <ThumbsUp className="w-3.5 h-3.5" />
                     Vote For
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                  >
+                  <Button variant="outline" size="sm">
                     <ThumbsDown className="w-3.5 h-3.5" />
                     Vote Against
+                  </Button>
+                </div>
+              )}
+              {p.status === "Passed" && (
+                <div className="flex gap-3">
+                  <Button size="sm">
+                    Execute
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    Cancel
                   </Button>
                 </div>
               )}
