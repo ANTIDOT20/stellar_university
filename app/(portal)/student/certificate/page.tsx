@@ -1,27 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Award, Shield, ExternalLink, Download, AlertCircle } from "lucide-react";
+import { Award, Shield, Download } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
+import { CredentialCard } from "@/components/CredentialCard";
+import { useCredentials } from "@/hooks/useCredentials";
 import { useWallet } from "@/components/wallet/WalletContext";
 
-interface Credential {
-  id:          string;
-  type:        string;
-  issuer:      string;
-  issuedAt:    string;
-  ipfsCid:     string;
-  degreeClass: string;
-  session:     string;
-  verified:    boolean;
-}
-
-const MOCK_CREDS: Credential[] = [];
-
 export default function CertificatePage() {
-  const { wallet } = useWallet();
-  const [requesting, setRequesting] = useState(false);
+  const { wallet }                  = useWallet();
+  const { credentials, loading }    = useCredentials();
+  const [verifyId, setVerifyId]     = useState("");
 
   return (
     <div className="p-8 max-w-3xl space-y-8">
@@ -55,46 +44,28 @@ export default function CertificatePage() {
       </div>
 
       {/* Credential list */}
-      {MOCK_CREDS.length === 0 ? (
+      {loading ? (
+        <div className="card-glass rounded-xl p-10 text-center text-su-text">Loading credentials…</div>
+      ) : credentials.length === 0 ? (
         <div className="card-glass rounded-xl p-10 text-center space-y-3">
           <Award className="w-10 h-10 text-su-text mx-auto" />
           <p className="text-white font-medium">No credentials yet</p>
           <p className="text-su-text text-sm max-w-sm mx-auto">
             Credentials are minted on-chain when you complete a programme.
-            You are currently in Level 100 — keep studying!
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {MOCK_CREDS.map((cred) => (
-            <div key={cred.id} className="card-glass rounded-xl p-5 space-y-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-white font-semibold">{cred.type}</p>
-                  <p className="text-su-text text-sm">{cred.degreeClass} · {cred.session}</p>
-                </div>
-                <Badge variant={cred.verified ? "green" : "default"}>
-                  {cred.verified ? "Verified" : "Pending"}
-                </Badge>
-              </div>
-              <div className="text-xs font-mono text-su-text">ID: {cred.id}</div>
-              <div className="flex gap-2">
-                <a
-                  href={`https://ipfs.io/ipfs/${cred.ipfsCid}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Button variant="outline" size="sm">
-                    <ExternalLink className="w-3.5 h-3.5" />
-                    IPFS
-                  </Button>
-                </a>
-                <Button size="sm">
-                  <Download className="w-3.5 h-3.5" />
-                  Download PDF
-                </Button>
-              </div>
-            </div>
+          {credentials.map((cred) => (
+            <CredentialCard
+              key={cred.id}
+              id={cred.id}
+              type={cred.type}
+              session={cred.session}
+              issuedAt={cred.issuedAt}
+              ipfsCid={cred.ipfsCid}
+              revoked={cred.revoked}
+            />
           ))}
         </div>
       )}
@@ -102,16 +73,22 @@ export default function CertificatePage() {
       {/* Verification tool */}
       <div className="card-glass rounded-xl p-6 space-y-3">
         <h2 className="text-white font-semibold">Verify any credential</h2>
-        <p className="text-su-text text-sm">
-          Enter a credential ID to verify it on-chain.
-        </p>
+        <p className="text-su-text text-sm">Enter a credential ID to verify it on-chain.</p>
         <div className="flex gap-3">
           <input
             type="text"
-            placeholder="Credential ID (hex or base64)"
+            placeholder="Credential ID (64-char hex)"
+            value={verifyId}
+            onChange={(e) => setVerifyId(e.target.value)}
             className="flex-1 bg-su-navy/60 border border-su-border rounded-xl px-4 py-2.5 text-white text-sm placeholder:text-su-text/40 focus:outline-none focus:border-su-gold/50"
           />
-          <Button variant="outline">Verify</Button>
+          <Button
+            variant="outline"
+            disabled={verifyId.length !== 64}
+            onClick={() => window.open(`/verify?id=${verifyId}`, "_blank")}
+          >
+            Verify
+          </Button>
         </div>
       </div>
     </div>
