@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Shield, CheckCircle2, XCircle, Search, ExternalLink } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Shield, CheckCircle2, XCircle, Search, ExternalLink, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Spinner } from "@/components/ui/Spinner";
+import { isValidCredentialId } from "@stellaru/credential-sdk";
 
 interface VerifyResult {
   valid:       boolean;
@@ -17,11 +17,13 @@ interface VerifyResult {
 }
 
 export default function VerifyPage() {
-  const [id,      setId]      = useState("");
-  const [result,  setResult]  = useState<VerifyResult | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error,   setError]   = useState<string | null>(null);
+  const [id,       setId]      = useState("");
+  const [result,   setResult]  = useState<VerifyResult | null>(null);
+  const [loading,  setLoading] = useState(false);
+  const [error,    setError]   = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+
+  const idValid = isValidCredentialId(id.trim());
 
   async function handleVerify() {
     if (!id.trim()) return;
@@ -87,11 +89,18 @@ export default function VerifyPage() {
               onKeyDown={(e) => e.key === "Enter" && handleVerify()}
               className="flex-1 bg-su-navy/60 border border-su-border rounded-xl px-4 py-2.5 text-white text-sm placeholder:text-su-text/40 focus:outline-none focus:border-su-gold/50 font-mono"
             />
-            <Button onClick={handleVerify} loading={loading} disabled={!id.trim() || loading}>
+            <Button onClick={handleVerify} loading={loading} disabled={!idValid || loading}>
               <Search className="w-4 h-4" />
               Verify
             </Button>
           </div>
+
+          {id && !idValid && (
+            <p className="text-su-text text-xs flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 text-su-gold" />
+              Credential IDs are 64-character lowercase hex strings.
+            </p>
+          )}
 
           {error && (
             <p className="text-red-400 text-sm">{error}</p>
