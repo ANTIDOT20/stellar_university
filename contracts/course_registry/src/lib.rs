@@ -132,6 +132,16 @@ impl CourseRegistryContract {
         env.storage().instance().get(&DataKey::CourseCount).unwrap_or(0)
     }
 
+    /// Extend the TTL of a course record to prevent ledger archival.
+    pub fn bump_expiry(env: Env, code: String) -> Result<(), ContractError> {
+        let key = DataKey::Course(code);
+        if !env.storage().persistent().has(&key) {
+            return Err(ContractError::CourseNotFound);
+        }
+        env.storage().persistent().extend_ttl(&key, 6_307_200, 6_307_200);
+        Ok(())
+    }
+
     fn require_admin(env: &Env, caller: &Address) -> Result<(), ContractError> {
         let admin: Address = env
             .storage()
