@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main, dev, "feat/**"]
   pull_request:
     branches: [main]
 
@@ -76,3 +76,4 @@ jobs:
           node-version: "20"
       - run: npm install
       - run: npm test
+      - run: npm run build
