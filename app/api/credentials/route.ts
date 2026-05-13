@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken, getTokenFromHeader } from "@/lib/auth";
+import { verifyCredentialOnChain } from "@/lib/credential";
 import { z } from "zod";
 
 const verifySchema = z.object({
@@ -27,12 +28,11 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { credentialId } = verifySchema.parse(body);
 
-    // Stub — call credential.verify(credentialId) on Soroban
+    const result = await verifyCredentialOnChain(credentialId);
     return NextResponse.json({
       credentialId,
-      valid:    true,
-      verified: false,
-      message:  "Contract verification not yet connected in this environment",
+      valid:   result.valid,
+      ...result.record,
     });
   } catch (err) {
     if (err instanceof z.ZodError) {
