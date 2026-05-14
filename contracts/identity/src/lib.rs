@@ -166,6 +166,17 @@ impl IdentityContract {
             .unwrap_or(false)
     }
 
+    /// Extend the TTL of a DID document. Callable by anyone — permissionless TTL bumping
+    /// allows block explorers and resolvers to keep active DIDs alive.
+    pub fn bump_expiry(env: Env, subject: Address) -> Result<(), ContractError> {
+        let key = DataKey::Did(subject);
+        if !env.storage().persistent().has(&key) {
+            return Err(ContractError::DidNotFound);
+        }
+        env.storage().persistent().extend_ttl(&key, 6_307_200, 6_307_200);
+        Ok(())
+    }
+
     fn require_admin(env: &Env, caller: &Address) -> Result<(), ContractError> {
         let admin: Address = env
             .storage()
