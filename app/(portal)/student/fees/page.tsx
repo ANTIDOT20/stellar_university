@@ -68,7 +68,7 @@ export default function FeesPage() {
         ))}
         <div className="flex justify-between px-6 py-4 font-semibold">
           <span className="text-white">Total (USDC)</span>
-          <span className="text-su-gold text-lg">${feeUsd.00}</span>
+          <span className="text-su-gold text-lg">${feeUsd.toFixed(2)}</span>
         </div>
       </div>
 
